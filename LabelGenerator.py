@@ -44,8 +44,7 @@ else:
 
 
 class PaperConfig:
-    def __init__(
-        self,
+    def __init__( self,
         pagesize: Tuple[float, float],
         sticker_width: float,
         sticker_height: float,
@@ -54,6 +53,8 @@ class PaperConfig:
         top_margin: float,
         horizontal_stride: float,
         vertical_stride: float,
+        nr_of_columns: int,
+        nr_of_rows: int,
     ) -> None:
         self.pagesize = pagesize
         self.sticker_width = sticker_width
@@ -63,7 +64,24 @@ class PaperConfig:
         self.top_margin = top_margin
         self.horizontal_stride = horizontal_stride
         self.vertical_stride = vertical_stride
+        self.nr_of_columns = nr_of_columns
+        self.nr_of_rows = nr_of_rows
 
+class Resistor_draw_settings:
+    def __init__(self,
+        squish_width: float,
+        squish_left: float,
+        value_font_size: float,
+        ohm_font_size: float,
+        smd_font_size: float,
+        space_between: float,
+    ) -> None:
+        self.squish_width = squish_width
+        self.squish_left = squish_left
+        self.value_font_size = value_font_size
+        self.ohm_font_size = ohm_font_size
+        self.smd_font_size = smd_font_size
+        self.space_between = space_between
 
 AVERY_5260 = PaperConfig(
     pagesize=LETTER,
@@ -71,11 +89,12 @@ AVERY_5260 = PaperConfig(
     sticker_height=1 * inch,
     sticker_corner_radius=0.1 * inch,
     left_margin=3/16 * inch,
-    top_margin=0.5 * inch,
+    top_margin=1.5 * inch,
     horizontal_stride=(2 + 6/8) * inch,
     vertical_stride=1 * inch,
+    nr_of_columns=3,
+    nr_of_rows=10,
 )
-
 
 AVERY_L7157 = PaperConfig(
     pagesize=A4,
@@ -83,30 +102,54 @@ AVERY_L7157 = PaperConfig(
     sticker_height=24.3 * mm,
     sticker_corner_radius=3 * mm,
     left_margin=6.4 * mm,
-    top_margin=14.1 * mm,
+    top_margin=38.4 * mm,
     horizontal_stride=66.552 * mm,
     vertical_stride=24.3 * mm,
+    nr_of_columns=3,
+    nr_of_rows=11,
 )
 
 
-EJ_RANGE_24 = PaperConfig(
+AVERY_5260_AVERY_L7157_resistorsettings = Resistor_draw_settings(
+    squish_width=0.1,
+    squish_left=0.05,
+    value_font_size=0.25,
+    ohm_font_size=0.15,
+    smd_font_size=0.08,
+    space_between=5,
+)
+
+
+Avery_3474_70x37_label = PaperConfig(
+    # For this label to be printed correct the printer setting should be set to print the actual size
+    # do not use 'fit to page'.
+    # This might not work for all printers (e.g. inkjet)
     pagesize=A4,
-    sticker_width=63.5 * mm,
-    sticker_height=33.9 * mm,
-    sticker_corner_radius=2 * mm,
-    left_margin=6.5 * mm,
-    top_margin=13.2 * mm,
-    horizontal_stride=66.45 * mm,
-    vertical_stride=33.9 * mm,
+    sticker_width=65 * mm,
+    sticker_height=18.5 * mm,
+    sticker_corner_radius=0 * mm,
+    left_margin=0.5 * mm,
+    top_margin=18 * mm,
+    horizontal_stride=70 * mm,
+    vertical_stride=18.5 * mm,
+    nr_of_columns=3,
+    nr_of_rows=16,  # a sheet has 24 stickers without space between the labels, this will fit 2 resistor labels per sticker.
+)
+
+Avery_3474_70x37_resistorsettings = Resistor_draw_settings(
+    squish_width=0.05,
+    squish_left=0.025,
+    value_font_size=0.125,
+    ohm_font_size=0.125,
+    smd_font_size=0.08,
+    space_between=2.5,
 )
 
 
 class StickerRect:
     def __init__(self, layout: PaperConfig, row: int, column: int):
         self.left = layout.left_margin + layout.horizontal_stride * column
-        self.bottom = layout.pagesize[1] - (
-            layout.sticker_height + layout.top_margin + layout.vertical_stride * row
-        )
+        self.bottom = layout.pagesize[1] - (layout.top_margin + layout.vertical_stride * row)
         self.width = layout.sticker_width
         self.height = layout.sticker_height
         self.corner = layout.sticker_corner_radius
@@ -393,12 +436,12 @@ def get_eia98_code(value):
     return digits + multiplier
 
 
-def draw_resistor_sticker(c, layout, row, column, ohms, draw_center_line=True):
+def draw_resistor_sticker(c, layout, resistorsettings , row, column, ohms, draw_center_line=True):
     rect = StickerRect(layout, row, column)
 
     # Squish horizontally by a bit, to prevent clipping
-    rect.width -= 0.1*inch
-    rect.left += 0.05*inch
+    rect.width -= resistorsettings.squish_width * inch
+    rect.left += resistorsettings.squish_left * inch
 
     # Draw middle line
     if draw_center_line:
@@ -413,10 +456,10 @@ def draw_resistor_sticker(c, layout, row, column, ohms, draw_center_line=True):
     resistor_value = ResistorValue(ohms)
     print("Generating sticker '{}'".format(resistor_value.format_value()))
 
-    value_font_size = 0.25 * inch
-    ohm_font_size = 0.15 * inch
-    smd_font_size = 0.08 * inch
-    space_between = 5
+    value_font_size = resistorsettings.value_font_size * inch
+    ohm_font_size = resistorsettings.ohm_font_size * inch
+    smd_font_size = resistorsettings.smd_font_size * inch
+    space_between = resistorsettings.space_between
 
     value_string = resistor_value.format_value()
     ohm_string = "\u2126"
@@ -455,17 +498,35 @@ def draw_resistor_sticker(c, layout, row, column, ohms, draw_center_line=True):
                       rect.height/13, get_eia98_code(resistor_value))
 
 
-def render_stickers(c, layout: PaperConfig, values, draw_center_line=True):
-    for (rowId, row) in enumerate(values):
-        for (columnId, value) in enumerate(row):
-            if not value:
-                continue
-            draw_resistor_sticker(c, layout, rowId, columnId, value, draw_center_line)
+def render_stickers(layout: PaperConfig, resistorsettings: Resistor_draw_settings, values, draw_center_line=True):
+    valuecntr = 0
+    pagecntr = 1
+    while valuecntr < len(values):
+        rowId = 0
+        c = canvas.Canvas("ResistorLabels_Page_" + str(pagecntr) + ".pdf", pagesize=layout.pagesize)
+        while rowId < layout.nr_of_rows and valuecntr < len(values):
+            columnId = 0
+            while columnId < layout.nr_of_columns and valuecntr < len(values):
+                value = values[valuecntr]
+                draw_resistor_sticker(c, layout, resistorsettings, rowId, columnId, value, draw_center_line)
+                valuecntr += 1
+                columnId += 1
+            rowId += 1
+        if rowId == layout.nr_of_rows or valuecntr == len(values):
+            # # Add this if you want to see the outlines of the labels.
+            # # Recommended to be commented out for the actual printing.
+            render_outlines(c, layout)
+            # Finish page
+            # Store canvas to PDF file
+            c.showPage()
+            c.save()
+            print("Saved Resistor Label page '{}'".format(pagecntr))
+            pagecntr += 1
 
 
 def render_outlines(c, layout: PaperConfig):
-    for y in range(3):
-        for x in range(10):
+    for y in range(layout.nr_of_columns):
+        for x in range(layout.nr_of_rows):
             rect = StickerRect(layout, x, y)
             c.setStrokeColor(black, 0.1)
             c.setLineWidth(0)
@@ -477,47 +538,42 @@ def main():
     # ############################################################################
     # Select the correct type of paper you want to print on.
     # ############################################################################
-    layout = AVERY_5260
+    # layout = AVERY_5260
     # layout = AVERY_L7157
-    # layout = EJ_RANGE_24
+    layout = Avery_3474_70x37_label
+
+    # ############################################################################
+    # select the font sizes for the resistor on the stickers
+    # make sure the resistor settings match the page layout
+    # Avery labels have one setting file.
+    # ############################################################################
+    # resistor_settings = AVERY_5260_AVERY_L7157_resistorsettings
+    resistor_settings = Avery_3474_70x37_resistorsettings
 
     # ############################################################################
     # Put your own resistor values in here!
-    #
-    # This has to be a grid of:
-    #  - 10*3 values for Avery 5260
-    #  - 11*3 for Avery L7157.
-    #  - 8*3 for EJ Range 24
-    #
-    # Add "None" if no label should get generated at a specific position.
+    # The number of pages needed is handled by the program.
+    # The list below results in 4 pages.
+    # You don't have to list resistor values for the whole page.
     # ############################################################################
     resistor_values = [
-        [.1,           .02,          .003],
-        [1,            12,           13],
-        [210,          220,          330],
-        [3100,         3200,         3300],
-        [41000,        42000,        43000],
-        [510000,       None,         530000],
-        [6100000,      6200000,      6300000],
-        [71000000,     72000000,     73000000],
-        [810000000,    820000000,    830000000],
-        [9100000000,   9200000000,   3300000000],
+         1, 1.2, 1.3, 1.5, 1.6, 1.8, 2, 2.2, 2.4, 2.7, 3, 3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2,
+         9.1,
+         10, 11, 12, 15, 18, 20, 22, 24, 27, 30, 33, 36, 39, 43, 47, 51, 56, 62, 68, 75, 82, 91,
+         100, 110, 120, 130, 150, 160, 180, 200, 220, 240, 270, 300, 330, 360, 390, 430, 470, 510, 560, 620, 680, 750,
+         820, 910,
+         1000, 1100, 1200, 1500, 1600, 1800, 2000, 2200, 2400, 2700, 3000, 3300, 3600, 3900, 4300, 4700, 5100, 5600,
+         6200, 6800, 7500, 8200, 9100,
+         10000, 11000, 12000, 13000, 15000, 16000, 18000, 20000, 22000, 24000, 27000, 30000, 33000, 36000, 39000, 43000,
+         47000, 51000, 56000, 62000, 68000, 75000, 82000, 91000,
+         100000, 110000, 120000, 130000, 150000, 160000, 180000, 200000, 220000, 240000, 270000, 300000, 330000, 360000,
+         390000, 430000, 470000, 510000, 560000, 620000, 680000, 750000, 820000, 910000,
+         1000000, 1200000, 1500000, 1800000, 2000000, 2200000, 2400000, 2700000, 3000000, 3300000, 3600000, 3900000,
+         4300000, 4700000, 5100000, 5600000, 6200000, 6800000, 7500000, 8200000, 9100000, 10000000,
     ]
 
-    # Create the render canvas
-    c = canvas.Canvas("ResistorLabels.pdf", pagesize=layout.pagesize)
-
     # Render the stickers
-    render_stickers(c, layout, resistor_values)
-
-    # # Add this if you want to see the outlines of the labels.
-    # # Recommended to be commented out for the actual printing.
-    # render_outlines(c, layout)
-
-    # Store canvas to PDF file
-    c.showPage()
-    c.save()
-
+    render_stickers(layout, resistor_settings, resistor_values)
 
 if __name__ == "__main__":
     main()
